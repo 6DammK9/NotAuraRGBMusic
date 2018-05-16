@@ -1,0 +1,9 @@
+{
+  "name": "not-aura-rgbmusic",
+  "version": "0.0.0",
+  "description": "NotAuraRGBMusic",
+  "main": "app.js",
+  "author": {
+    "name": "User"
+  }
+}
