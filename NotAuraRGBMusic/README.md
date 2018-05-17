@@ -22,6 +22,9 @@
 - Open [http://localhost:9997/](http://localhost:9997/) in browser 
 - Make sure you open it in a separate Window ( It halts when switched tab or minimized - To be investigated. )
 - Click ( required by recent Chrome ) and enjoy the blast!
+### Run in standalone webpage (as audio visualiser only)
+- You can directly open `./public/analyser.html` as standalone webpage. 
+- It still capture audio and perform analysis, but there will be no device control, or the [AudioWorklet](https://developer.mozilla.org/en-US/docs/Web/API/Worklet/addModule) feature.
 ### General workflow
 - Fetch, tune (if you want), and analyse Audio, then obtatin sound volume ( by rms ) and base frequency ( detault autocorrelation, with  FFT peak as fallback )
 - Calculate the relative power level from sound volume ( ranged from [0,1], based from the lowest sound volume in FFT spectrum )
