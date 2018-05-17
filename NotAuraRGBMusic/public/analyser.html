@@ -7,6 +7,7 @@
     <title> Definitely Not Aura RGB </title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.1.0/socket.io.slim.js"></script>
     <style>
+
         body {
             background: black;
             font: 24px "Lucida Grande", Helvetica, Arial, sans-serif;
@@ -186,16 +187,22 @@
 
             //Create audio source
             //Here, we use an audio file, but this could also be e.g. microphone input
-            const audioEle = new Audio();
+            let audioEle = null;
 
-            //audioEle.src = "test.flac";
-            audioEle.src = 'my-audio.mp3';
-            //audioEle.src = '880.wav';//insert file name here
-            audioEle.autoplay = !ms_input; //true;
-            audioEle.preload = 'auto';
+            try {
+                audioEle = new Audio();
+                //audioEle.src = "test.flac";
+                audioEle.src = 'my-audio.mp3';
+                //audioEle.src = '880.wav';//insert file name here
+                audioEle.autoplay = !ms_input; //true;
+                audioEle.preload = 'auto';
+            } catch (e) {
+                console.log(e);
+            }
 
             const audioSourceNode = ms_input ?
-                audioCtx.createMediaStreamSource(ms_input) : audioCtx.createMediaElementSource(audioEle);
+                audioCtx.createMediaStreamSource(ms_input) : audioEle ? audioCtx.createMediaElementSource(audioEle) : null;
+            if (!audioSourceNode) { console.log("No Audio source found."); return; }
 
             //Create filter
             const biquadFilter = audioCtx.createBiquadFilter();
@@ -219,22 +226,75 @@
 
             //scriptNode.onaudioprocess = function (audioProcessingEvent) {
             //	g_result.fps_a++;
-            //console.log("o");
+            //    console.log("o");
             //};
 
             //console.log(analyserNode);
 
-            //Set up audio node network
-            audioSourceNode.connect(biquadFilter);
-            biquadFilter.connect(analyserNode);
-            if (!ms_input) {
-                //analyserNode.connect(scriptNode);
-                analyserNode.connect(audioCtx.destination);
-            }
-            //audioSourceNode.connect(analyserNode);
-            //analyserNode.connect(audioCtx.destination);
+            //https://developers.google.com/web/updates/2017/12/audio-worklet
+            //https://googlechromelabs.github.io/web-audio-samples/audio-worklet/
+            let foundWorklet = audioCtx.audioWorklet;
 
-            //console.log(audioCtx.sampleRate);
+            if (foundWorklet) {
+                console.log("Found audioWorklet! No more force showing Canvas!");
+
+                audioCtx.audioWorklet.addModule('processor.js', { credentials: "include" }).then(() => {
+                    let AWNode = new AudioWorkletNode(audioCtx, 'my-worklet-processor');
+
+                    AWNode.port.onmessage = (event) => {
+                        // Handling data from the processor.
+                        //console.log(event);
+                        start_analysis_frame();
+
+                        g_result.fps_a++;
+                        socket.emit("aura", [bg_r, bg_g, bg_b]);
+                    };
+
+                    AWNode.port.postMessage('Hello!');
+                    console.log(AWNode);
+
+                    audioSourceNode.connect(biquadFilter);
+                    biquadFilter.connect(AWNode);
+                    AWNode.connect(analyserNode);
+                    if (!ms_input) {
+                        //audioSourceNode.connect(scriptNode);
+                        analyserNode.connect(audioCtx.destination);
+                    }
+                }).catch((e) => {
+                    foundWorklet = false;
+                    //No suprise. Just connect nodes.
+
+                    //Set up audio node network
+                    audioSourceNode.connect(biquadFilter);
+                    biquadFilter.connect(analyserNode);
+                    if (!ms_input) {
+                        //audioSourceNode.connect(scriptNode);
+                        analyserNode.connect(audioCtx.destination);
+                    }
+
+                    if (e.toString().includes("AbortError")) {
+                        console.log("audioWorklet requires a server actually hosting them!");
+                    } else {
+                        console.log(e);
+                    }
+                });
+            } else {
+                //No suprise. Just connect nodes.
+
+                //Set up audio node network
+                audioSourceNode.connect(biquadFilter);
+                biquadFilter.connect(analyserNode);
+                if (!ms_input) {
+                    //audioSourceNode.connect(scriptNode);
+                    analyserNode.connect(audioCtx.destination);
+                }
+                //audioSourceNode.connect(analyserNode);
+                //analyserNode.connect(audioCtx.destination);
+
+                //console.log(audioCtx.sampleRate);
+            }
+
+            let bg_r, bg_g, bg_b;
 
             //Create 2D canvas
             const canvas = document.createElement('canvas');
@@ -301,25 +361,23 @@
 
 
             let keep_drawing = true;
-            let g_result = { fps_v: 0 };
+            let g_result = { fps_v: 0, fps_a: 0 };
             let g_interval = null;
             audioEle.onended = () => { keep_drawing = false; };
 
-            const draw = () => {
-                if (!keep_drawing) { return; }
+            //Pretty create conversion. Audible to visible.
+            // 20~20000Hz = -5 to 5 octave.
+            // 10000 - 40 = 9960
+            // 1 / ( 1 / 380 - 1 / 780 ) = 741
+            const sound_freq_to_light_wavelength = (s_freq) => {
+                //It should able to be infinity.
+                const octave = Math.log(s_freq / spectrum_base) / Math.log(2) - min_octave;
+                const octave_relative_offset = 0
+                const octave_scale = (octave_range - octave_relative_offset * 2) / (octave + octave_relative_offset);
+                return 1 / (1 / 780 + 1 / (741 * octave_scale));
+            };
 
-                //Schedule next redraw
-                requestAnimationFrame(draw);
-
-                //Get spectrum data
-                analyserNode.getFloatFrequencyData(dataArray);
-                analyserNode.getFloatTimeDomainData(AnothrDataArray);
-                //dataArray = dataArray.map(i => ( nuttall( i, bufferLength) ) );
-                //dataArray = dataArray.map(i => i-1.0);
-                //console.log(dataArray[0]);
-
-
-
+            const start_analysis_frame = () => {
                 let lowest_vol = 0;
                 let base_freq = { i: 0, a: analyserNode.minDecibels };
 
@@ -337,7 +395,6 @@
 
                 let autocol = autoCorrelate(AnothrDataArray, sampleRate);
                 let pitch_fz = autocol.freq;
-                let pitch = pitch_fz > 0 ? Math.round(pitch_fz * anotherbufferlength / sampleRate) : -1;
                 let vol_rms = Math.sqrt(vol_sum / anotherbufferlength);
 
 
@@ -352,38 +409,46 @@
 
                 //Draw black background
                 const fill_bg_greyscale = Math.floor(g_result.led_pow * 256);
-                //Pretty create conversion. Audible to visible.
-                // 20~20000Hz = -5 to 5 octave.
-                // 10000 - 40 = 9960
-                // 1 / ( 1 / 380 - 1 / 780 ) = 741
-                const sound_freq_to_light_wavelength = (s_freq) => {
-                    //It should able to be infinity.
-                    const octave = Math.log(s_freq / spectrum_base) / Math.log(2) - min_octave;
-                    const octave_relative_offset = 0
-                    const octave_scale = (octave_range - octave_relative_offset * 2) / (octave + octave_relative_offset);
-                    return 1 / (1 / 780 + 1 / (741 * octave_scale));
-                };
 
                 const freq_color_space = wavelengthToColor(sound_freq_to_light_wavelength(pitch_fz > 0 ? pitch_fz : sampleRate * (base_freq.i + 1) / analyserNode.fftSize));
                 //freq_color_space=[rgba,r,g,b,a];
 
                 //canvasCtx.fillStyle = `rgba(${fill_bg_greyscale},${fill_bg_greyscale},${fill_bg_greyscale},1)`;
-                const bg_r = freq_color_space[1] * freq_color_space[4] * g_result.led_pow * 256;
-                const bg_g = freq_color_space[2] * freq_color_space[4] * g_result.led_pow * 256;
-                const bg_b = freq_color_space[3] * freq_color_space[4] * g_result.led_pow * 256;
+                bg_r = freq_color_space[1] * freq_color_space[4] * g_result.led_pow * 256;
+                bg_g = freq_color_space[2] * freq_color_space[4] * g_result.led_pow * 256;
+                bg_b = freq_color_space[3] * freq_color_space[4] * g_result.led_pow * 256;
+            }
+
+            const draw = () => {
+                if (!keep_drawing) { return; }
+
+                //Schedule next redraw
+                requestAnimationFrame(draw);
+
+                //Get spectrum data
+                analyserNode.getFloatFrequencyData(dataArray);
+                analyserNode.getFloatTimeDomainData(AnothrDataArray);
+                //dataArray = dataArray.map(i => ( nuttall( i, bufferLength) ) );
+                //dataArray = dataArray.map(i => i-1.0);
+                //console.log(dataArray[0]);
+
+                if (!foundWorklet)
+                    start_analysis_frame();
 
                 canvasCtx.fillStyle = `rgba(${bg_r},${bg_g}, ${bg_b}, 1)`;
                 canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
 
+                let pitch = g_result.pitch_fz > 0 ? Math.round(g_result.pitch_fz * anotherbufferlength / sampleRate) : -1;
+
                 let posX = 0;
                 for (let i = 0; i < bufferLength; i++) {
                     const barHeight = (dataArray[i] + (-analyserNode.minDecibels)) * canvas.height / (-analyserNode.minDecibels); //(dataArray[i] + 140) * 2;
-                    const barColor = ((i == base_freq.i) << 1) + (i == pitch);
+                    const barColor = ((i == g_result.base_freq) << 1) + (i == pitch);
 
                     const default_barColorSpace = wavelengthToColor(sound_freq_to_light_wavelength(actual_freq(i)));
-                    const d_r = default_barColorSpace[1] * default_barColorSpace[4] * 256;
-                    const d_g = default_barColorSpace[2] * default_barColorSpace[4] * 256;
-                    const d_b = default_barColorSpace[3] * default_barColorSpace[4] * 256;
+                    const d_r = default_barColorSpace[1] * default_barColorSpace[4] * g_result.led_pow * 256;
+                    const d_g = default_barColorSpace[2] * default_barColorSpace[4] * g_result.led_pow * 256;
+                    const d_b = default_barColorSpace[3] * default_barColorSpace[4] * g_result.led_pow * 256;
 
                     switch (barColor) {
                         case 0: canvasCtx.fillStyle = `rgba(${d_r},${d_g}, ${d_b}, 1)`; break;
@@ -399,7 +464,9 @@
                 }
 
                 g_result.fps_v++;
-                socket.emit("aura", [bg_r, bg_g, bg_b]);
+                //Actually no sense to send duplicate data (actually it's around 40FPS)
+                if (!foundWorklet)
+                    socket.emit("aura", [bg_r, bg_g, bg_b]);
             };
 
             draw();
@@ -408,7 +475,7 @@
             g_interval = setInterval(() => {
                 console.log(g_result);
                 g_result.fps_v = 0;
-                //g_result.fps_a = 0;
+                g_result.fps_a = 0;
             }, 1000);
         }
 
