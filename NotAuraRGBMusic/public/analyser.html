@@ -177,7 +177,11 @@
         const main = (ms_input) => {
             let socket = null;
             try {
-                socket = io(ws_server);
+                if (window.location.origin != "file://") {
+                    socket = io(ws_server);
+                } else {
+                    console.log("Started as standalone webpage. WebSocket and AudioWorklet will not start.");
+                }
             } catch (e) {
                 console.log(e);
             }
@@ -215,7 +219,7 @@
             analyserNode.fftSize = 1024;
             analyserNode.minDecibels = -150; //As low as -140
             analyserNode.maxDecibels = -5;
-            analyserNode.smoothingTimeConstant = 0.25;
+            analyserNode.smoothingTimeConstant = 0.72;
             const bufferLength = analyserNode.frequencyBinCount;
             let dataArray = new Float32Array(bufferLength);
             const anotherbufferlength = analyserNode.fftSize;
@@ -235,7 +239,7 @@
             //https://googlechromelabs.github.io/web-audio-samples/audio-worklet/
             let foundWorklet = audioCtx.audioWorklet;
 
-            if (foundWorklet) {
+            if (socket && foundWorklet) {
                 console.log("Found audioWorklet! No more force showing Canvas!");
 
                 audioCtx.audioWorklet.addModule('processor.js', { credentials: "include" }).then(() => {
@@ -247,7 +251,8 @@
                         start_analysis_frame();
 
                         g_result.fps_a++;
-                        socket.emit("aura", [bg_r, bg_g, bg_b]);
+                        if (socket)
+                            socket.emit("aura", [led_r, led_g, led_b]);
                     };
 
                     AWNode.port.postMessage('Hello!');
@@ -294,7 +299,7 @@
                 //console.log(audioCtx.sampleRate);
             }
 
-            let bg_r, bg_g, bg_b;
+            let led_r, led_g, led_b, sce_r, sce_g, sce_b;
 
             //Create 2D canvas
             const canvas = document.createElement('canvas');
@@ -324,6 +329,10 @@
                 const min = Math.log(-l_amp * analyserNode.fftSize);
                 //console.log([l_amp,  analyserNode.fftSize, min, Math.log(rms)]);
                 return (Math.log(rms) + min) / min;
+            }
+
+            const amp_ledpw = function (rgb, a) {
+                return rgb;
             }
 
             const TWOPI = Math.PI * 2;
@@ -414,9 +423,15 @@
                 //freq_color_space=[rgba,r,g,b,a];
 
                 //canvasCtx.fillStyle = `rgba(${fill_bg_greyscale},${fill_bg_greyscale},${fill_bg_greyscale},1)`;
-                bg_r = freq_color_space[1] * freq_color_space[4] * g_result.led_pow * 256;
-                bg_g = freq_color_space[2] * freq_color_space[4] * g_result.led_pow * 256;
-                bg_b = freq_color_space[3] * freq_color_space[4] * g_result.led_pow * 256;
+                //Screen is fine for scalar scale
+                sce_r = freq_color_space[1] * freq_color_space[4] * g_result.led_pow * 256;
+                sce_g = freq_color_space[2] * freq_color_space[4] * g_result.led_pow * 256;
+                sce_b = freq_color_space[3] * freq_color_space[4] * g_result.led_pow * 256;
+
+                //Devices strangely has log scale instead of scalar scale
+                led_r = freq_color_space[1] * Math.pow(256, freq_color_space[4] * g_result.led_pow);
+                led_g = freq_color_space[2] * Math.pow(256, freq_color_space[4] * g_result.led_pow);
+                led_b = freq_color_space[3] * Math.pow(256, freq_color_space[4] * g_result.led_pow);
             }
 
             const draw = () => {
@@ -432,10 +447,10 @@
                 //dataArray = dataArray.map(i => i-1.0);
                 //console.log(dataArray[0]);
 
-                if (!foundWorklet)
+                if (!socket || !foundWorklet)
                     start_analysis_frame();
 
-                canvasCtx.fillStyle = `rgba(${bg_r},${bg_g}, ${bg_b}, 1)`;
+                canvasCtx.fillStyle = `rgba(${sce_r},${sce_g}, ${sce_b}, 1)`;
                 canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
 
                 let pitch = g_result.pitch_fz > 0 ? Math.round(g_result.pitch_fz * anotherbufferlength / sampleRate) : -1;
@@ -465,8 +480,8 @@
 
                 g_result.fps_v++;
                 //Actually no sense to send duplicate data (actually it's around 40FPS)
-                if (!foundWorklet)
-                    socket.emit("aura", [bg_r, bg_g, bg_b]);
+                if (socket && !foundWorklet)
+                    socket.emit("aura", [led_r, led_g, led_b]);
             };
 
             draw();

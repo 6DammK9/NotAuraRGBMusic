@@ -28,16 +28,25 @@ io.on('connection', (socket) => {
     });
 });
 
+const led_t = 100; //poll frequency in ms
+const skip_everysent = 20;
+let skip_counter = 0;
 let fps_a = 0;
 let aurasync = null;
 let cur = [0, 0, 0];
 
 const readaudio = () => {
-    console.log(`fps_a=${fps_a}`);
+    process.stdout.write(`fps_a=${Math.round(fps_a * 1000 / led_t)}, cur=${cur}         \r`);
     fps_a = 0;
-    if (aurasync)
+    
+    if (aurasync && skip_counter % skip_everysent)
         aurasync.forEach(led => led.setColorNow(`rgb(${cur[0]}, ${cur[1]}, ${cur[2]})`));
+        //aurasync.forEach(led => led.setColorNow(`rgb(32,32,32)`));
     //aurasync.forEach( led => led.updateColor() );
+
+    //cur = cur.map(i => i==128?255:128);
+    skip_counter++;
+    skip_counter %= skip_everysent;
 };
 
 const main = () => {
@@ -80,7 +89,7 @@ const main = () => {
 
     server.listen(port);
 
-    setInterval(readaudio, 100);
+    setInterval(readaudio, led_t);
 
     console.log(io ? `WS Server is running on port ${port}` : `WS Server is not started`);
 
