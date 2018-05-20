@@ -5,7 +5,7 @@
     <meta charset="utf-8">
     <link href="data:image/x-icon;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQEAYAAABPYyMiAAAABmJLR0T///////8JWPfcAAAACXBIWXMAAABIAAAASABGyWs+AAACbUlEQVRIx7WUsU/qUBTGv96WSlWeEBZijJggxrREdwYixMnByYEyOvgfsBAMG0xuDsZ/QGc3NDFhgTioiYsmkhBYGLSBkLYR0va8gSjvQXiIT7/l5ibfOd/v3pN7gSmVSMTj8ThRfzdYk8lkMpl83/+AVFVVVXU0eHiVJEmSpB8DIcpkMplsdhCYz+fzhQJROBwOh8PDQN+oQCAQCASIRFEURZHI45GkP0/e7Xa73e70AMJnjel0Op1OA6oaDB4eAkAw6PcDvZ5t6zrw/Hx2trAw/cHYZ426ruu6DtzcGEYuBzQa19etFvD4WKtls4AoRqMPDwBjjLGPrt84ilgsFovF6EOapmmaRiP6O/jbAIguL4vFYpHGqlKpVCoVomq1Wq1Wibxer9fn+w+Q9+cUiUQikQhNrfdgWZZlWf4yyGhj27Zt254MUK/X6/X6F0aiKIqiKIOCYRmGYRjGZADLsizLIgqFQqHV1SkAnp5OTn79ItK0qyuPZ7SxaZqmaU4GKJfPzxmbfAPc/f3pqaIQLS8vLtZqgOP0bYyJoiAARC5Xrwf4/Vtbb2+Th1YqlUqlErC01GgkEkCz2WxyHLC+LsuiCAiCJLlcgM+3vd3pcBzXaJTLR0dEs7Ptdv+D4TiOG/A6DsBxQKvV621sAGtru7vl8ngAjuvXv7xcXIgiwNjMjCj2h+k4fQfPA4LA8xwHCO323V2hABiG223bwPy8xwMAbvfcHGMAY32j47y+3t4OAsZpZ2dzEwAsy7IcBxAExhwHMIxOx3GAlZVUyjT/1WFIudzenstFlEpFo9M8o+Pj/X2eJzo4SCR4fnzdb2N4Pyv9cduVAAAAAElFTkSuQmCC" rel="icon" type="image/x-icon" />
     <title> Definitely Not Aura RGB </title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.1.0/socket.io.slim.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.1.1/socket.io.slim.js"></script>
     <style>
 
         body {
@@ -25,12 +25,15 @@
             left: 0;
             text-align: center;
             vertical-align: middle;
+            flex-direction: column;
         }
     </style>
 </head>
 <body>
-    <div id="init_btn" onclick="main2()">
-        <h1>Click to start</h1>
+    <div id="init_btn">
+        <h1 onclick="main2({})" style="background:#222"> Click to start </h1>
+
+        <h1 onclick="main2({ noDrawing: true })" style="background:#222"> Click to start (No animation) </h1>
     </div>
     <script>
         'use strict';
@@ -100,7 +103,7 @@
 
 
         const MIN_SAMPLES = 0;  // will be initialized when AudioContext is created.
-        const GOOD_ENOUGH_CORRELATION = 0.72; // this is the "bar" for how close a correlation needs to be
+        const GOOD_ENOUGH_CORRELATION = 0.5; // this is the "bar" for how close a correlation needs to be
 
         function autoCorrelate(buf, sampleRate) {
             const SIZE = buf.length;
@@ -216,8 +219,8 @@
 
             //Create analyser node
             const analyserNode = audioCtx.createAnalyser();
-            analyserNode.fftSize = 1024;
-            analyserNode.minDecibels = -150; //As low as -140
+            analyserNode.fftSize = 8192; //[32, 32768]
+            analyserNode.minDecibels = -200; //As low as -140
             analyserNode.maxDecibels = -5;
             analyserNode.smoothingTimeConstant = 0.72;
             const bufferLength = analyserNode.frequencyBinCount;
@@ -245,14 +248,26 @@
                 audioCtx.audioWorklet.addModule('processor.js', { credentials: "include" }).then(() => {
                     let AWNode = new AudioWorkletNode(audioCtx, 'my-worklet-processor');
 
+                    let aw_lock = false;
+                    const max_poll_freq = 144;
+
+
                     AWNode.port.onmessage = (event) => {
                         // Handling data from the processor.
                         //console.log(event);
-                        start_analysis_frame();
+                        if (aw_lock) { console.log("locked"); return; }
+                        aw_lock = true;
 
-                        g_result.fps_a++;
-                        if (socket)
+                        if (socket && Math.random() < max_poll_freq / g_result.last_fps_a) {
+                            analyserNode.getFloatFrequencyData(dataArray);
+                            analyserNode.getFloatTimeDomainData(AnothrDataArray);
+                            start_analysis_frame();
+
                             socket.emit("aura", [led_r, led_g, led_b]);
+                            socket.emit("logi", [sce_r, sce_g, sce_b].map(d => Math.round(d / 256 * 100)));
+                        }
+                        g_result.fps_a++;
+                        aw_lock = false;
                     };
 
                     AWNode.port.postMessage('Hello!');
@@ -315,7 +330,35 @@
             const spectrum_base = 440; //Hz
             const audible_range = [20, 20000];
             const sampleRate = audioCtx.sampleRate; //Hz (By observe)
-            const sum_width = 2.2027; //sampleRate == 48000 ? 2.2027: 2.026; //By above setting
+            console.log({ sampleRate: sampleRate });
+
+            //TODO: Someone provide me a perfect formula? This table would be very clumsy...
+            const sum_width = () => {
+                const sum_map = {
+                    44100: {
+                        1024: 2.026,
+                        //32768: 1038.9999999999984
+                    },
+                    48000: {
+                        1024: 2.2027,
+                    },
+                    192000: {
+                        1024: 0.5506728826337318, //375Hz, 60+FPS
+                        2048: 1.2029715531999376, //187.6832844Hz, 60+FPS
+                        4096: 2.6092304764434577, //93.7957987Hz, 60+FPS
+                        8192: 5.625071493709246, //60Hz, 55FPS
+                        16384: 12.063399873076621, //60Hz, 30FPS
+                        32768: 25.753349323121988,  //60Hz, 21FPS
+                    }
+                }
+
+                if (!sum_map[sampleRate]) {
+                    return canvas.width; //Then log_sumWidth() will show the the captured width
+                } else {
+                    let w = sum_map[sampleRate][analyserNode.fftSize];
+                    return w ? w : canvas.width;
+                }
+            };
             const min_octave = Math.floor(Math.log(audible_range[0] / spectrum_base) / Math.log(2)); // -5
             const octave_range = Math.floor(Math.log(audible_range[1] / spectrum_base) / Math.log(2)) - Math.floor(Math.log(audible_range[0] / spectrum_base) / Math.log(2)); //9.965784
 
@@ -354,19 +397,23 @@
 
             const barWidth = function (i) {
 
-                let width_multuply = canvas.width / sum_width;
+                let width_multuply = canvas.width / sum_width();
                 //let width_multuply = ((canvas.width - bufferLength) / sum_width);
                 //width_multuply *
-                return width_multuply * Math.pow(2, -((Math.log(actual_freq(i) / spectrum_base)) / Math.log(2) - min_octave));
+                return width_multuply * Math.pow(2, - ((Math.log(actual_freq(i) / spectrum_base)) / Math.log(2) - min_octave));
                 //return Math.pow(1.0035, bufferLength - i);
                 //return (canvas.width / bufferLength);
             }
 
-            //const test_arr = [];
-            //for(var i = 0; i < analyserNode.fftSize; i++){test_arr.push(barWidth(i));}
-            //console.log(min_octave);
-            //console.log(test_arr);
-            //console.log(test_arr.reduce((a,b)=>a+b) - canvas.width);
+            const log_sumWidth = () => {
+                let test_arr = [];
+                for (var i = 0; i < analyserNode.fftSize; i++) { test_arr.push(barWidth(i)); }
+                //console.log(min_octave);
+                //console.log(test_arr);
+                console.log(test_arr.reduce((a, b) => a + b));
+            }
+
+            log_sumWidth();
 
 
             let keep_drawing = true;
@@ -381,12 +428,14 @@
             const sound_freq_to_light_wavelength = (s_freq) => {
                 //It should able to be infinity.
                 const octave = Math.log(s_freq / spectrum_base) / Math.log(2) - min_octave;
-                const octave_relative_offset = 0
-                const octave_scale = (octave_range - octave_relative_offset * 2) / (octave + octave_relative_offset);
+                const octave_relative_offset = [-1.2, 0.8]; //[bottom, top]
+                const octave_scale = (octave_range - octave_relative_offset[1]) / (octave + octave_relative_offset[0]);
                 return 1 / (1 / 780 + 1 / (741 * octave_scale));
             };
 
             const start_analysis_frame = () => {
+                //console.log("yo");
+
                 let lowest_vol = 0;
                 let base_freq = { i: 0, a: analyserNode.minDecibels };
 
@@ -438,17 +487,22 @@
                 if (!keep_drawing) { return; }
 
                 //Schedule next redraw
-                requestAnimationFrame(draw);
+                if (!ui_option.noDrawing) {
+                    requestAnimationFrame(draw);
+                }
 
-                //Get spectrum data
-                analyserNode.getFloatFrequencyData(dataArray);
-                analyserNode.getFloatTimeDomainData(AnothrDataArray);
+
                 //dataArray = dataArray.map(i => ( nuttall( i, bufferLength) ) );
                 //dataArray = dataArray.map(i => i-1.0);
                 //console.log(dataArray[0]);
 
-                if (!socket || !foundWorklet)
+                if (!socket || !foundWorklet) {
+                    //Get spectrum data
+                    analyserNode.getFloatFrequencyData(dataArray);
+                    analyserNode.getFloatTimeDomainData(AnothrDataArray);
                     start_analysis_frame();
+                }
+
 
                 canvasCtx.fillStyle = `rgba(${sce_r},${sce_g}, ${sce_b}, 1)`;
                 canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
@@ -456,6 +510,9 @@
                 let pitch = g_result.pitch_fz > 0 ? Math.round(g_result.pitch_fz * anotherbufferlength / sampleRate) : -1;
 
                 let posX = 0;
+                let posX_add = 0;
+
+                const canvas_inc = 1;
                 for (let i = 0; i < bufferLength; i++) {
                     const barHeight = (dataArray[i] + (-analyserNode.minDecibels)) * canvas.height / (-analyserNode.minDecibels); //(dataArray[i] + 140) * 2;
                     const barColor = ((i == g_result.base_freq) << 1) + (i == pitch);
@@ -473,15 +530,27 @@
                         default: canvasCtx.fillStyle = "rgb(128,128,128)";
                     }
 
-                    canvasCtx.fillRect(posX, canvas.height - barHeight, barWidth(i), barHeight);
-                    posX += barWidth(i); // + 1;
+                    //Avoid Sub-pixel rendering (Will improve up to 5 FPS when fftsize is high)
+                    posX_add += barWidth(i);
+                    if (posX_add >= canvas_inc) {
+                        canvasCtx.fillRect(posX, canvas.height - barHeight, barWidth(i) >= canvas_inc ? barWidth(i) : canvas_inc, barHeight);
+                        posX_add = 0;
+                    }
+                    //canvasCtx.fillRect(posX, canvas.height - barHeight, barWidth(i), barHeight);
+                    posX += barWidth(i);
+                    //canvasCtx.fillRect(posX, canvas.height - barHeight, Math.round(barWidth(i)), barHeight);
+                    //posX += Math.round(barWidth(i));
+
                     if (posX > canvas.width) break;
                 }
 
                 g_result.fps_v++;
-                //Actually no sense to send duplicate data (actually it's around 40FPS)
-                if (socket && !foundWorklet)
+
+                if (socket && !foundWorklet) {
                     socket.emit("aura", [led_r, led_g, led_b]);
+                    socket.emit("logi", [sce_r, sce_g, sce_b].map(d => Math.round(d / 256 * 100)));
+                }
+
             };
 
             draw();
@@ -489,14 +558,20 @@
             clearInterval(g_interval);
             g_interval = setInterval(() => {
                 console.log(g_result);
+                g_result.last_fps_v = g_result.fps_v;
+                g_result.last_fps_a = g_result.fps_a;
                 g_result.fps_v = 0;
                 g_result.fps_a = 0;
             }, 1000);
         }
 
-        const main2 = () => {
+        let ui_option = {};
+
+        const main2 = (option) => {
 
             document.getElementById("init_btn").style.display = "none";
+
+            ui_option = option;
 
             const alert_missing = (missing) => { alert(missing + " is not supported!"); }
             if (!navigator.mediaDevices) { alert_missing("navigator.mediaDevices"); return; }

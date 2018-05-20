@@ -35,9 +35,12 @@
   <ItemGroup>
     <Compile Include="AURA_WS.js" />
     <Compile Include="public\processor.js" />
+    <Compile Include="server_modules\aura_sync.js" />
+    <Compile Include="server_modules\p_logiled.js" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="public\" />
+    <Folder Include="server_modules\" />
   </ItemGroup>
   <!-- Do not delete the following Import Project.  While this appears to do nothing it is a marker for setting TypeScript properties before our import that depends on them. -->
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\TypeScript\Microsoft.TypeScript.targets" Condition="False" />

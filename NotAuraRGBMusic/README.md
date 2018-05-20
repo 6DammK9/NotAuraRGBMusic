@@ -17,6 +17,7 @@
 - Locate the folder `./NotAuraRGBMusic` via CLI 
 -- For Windows, go to that folder, `Shift+Enter` and "open console in folder".
 - `npm install`
+- If you received problems about `logiled`, Goto `node_modules/logiled` and then `npm install` again.
 - `npm start` or `node AURA_WS.js`
 - Double check your default System Sound Input and Output ( Webpage use default options only )
 - Open [http://localhost:9997/](http://localhost:9997/) in browser 
@@ -26,7 +27,9 @@
 - You can directly open `./public/analyser.html` as standalone webpage. 
 - It still capture audio and perform analysis, but there will be no device control, or the [AudioWorklet](https://developer.mozilla.org/en-US/docs/Web/API/Worklet/addModule) feature.
 ### General workflow
-- Fetch, tune (if you want), and analyse Audio, then obtatin sound volume ( by rms ) and base frequency ( detault autocorrelation, with  FFT peak as fallback )
+- Detect and Fetch Audio source (with settings, e.g. sample rate, channels)
+- Tune (if you want, currently attached with an empty `biquadFilter`)
+- Analyse Audio, then obtatin sound volume ( by rms ) and base frequency ( detault autocorrelation, with  FFT peak as fallback )
 - Calculate the relative power level from sound volume ( ranged from [0,1], based from the lowest sound volume in FFT spectrum )
 - Draw the spectrum via canvas:
 
@@ -41,20 +44,34 @@
 |White|Black|
 
 - Merge the base frequency ( as the color of the mark )  and relative sound volume ( as a number from 0 to 1 ) into the final color as RGB value
-- Draw the spectrum, and send the RGB value to server via WebSocket
+- Draw the spectrum, and send the RGB value (scaled to device's parameter) to server via WebSocket
 - When server received RGB value, buffer it and poll to Aura RGB devices by interval
 ### Options
 - Coming soon ( just modify scripts and try )
 ### TODOs
 - Find hardware to test `aura-sdk` ( I have RGB GPU only )
-- Configuration file for server + Configuration in entry point ( webpage )
-- Standalone webpage without internet connection ( currently using CDN )
+- Razor / Cosair hardware? (Need hardware)
+- Perkey rendering in Logitech Keyboard? (Need hardware)
+- Configuration file for server (seperate class) + Configuration in entry point ( webpage will come as url query + button )
 - Code review ( currently it's totally in mess )
+- Supress polling frequency to server by delta
+- Using solely on AudioWorklet (Very useful when in extreme condition. < 30FPS in highest setting in animation, audio and web transfer) instead of AnalyserNode in main process
+- Even more standalone solution - Pack everything in Electron, using IPC to communicate
+- C# backend?
+- Build script specially for `logiled`
 ### Changelog
 
-|Version|Description|
-|---|---|
-|0.0.1|Initial (and still in progress) commit|
+- 0.1.0
+-- Logitech Device supported.
+-- Used `Promise` / `async function` to wrap the device-related functions.
+-- Partially fixed Screen Scale problem on high Sample rate + FFT size.
+-- Lowered the effect on sub-pixel rendering.
+-- Supressed polling frequency to server (by random. Should be by delta.)
+-- Offset tunning of color spectrum (To make the result more "colorful")
+-- Added an option to draw nothing but keep sending data to server.
+
+- 0.0.1
+-- Initial (and still in progress) commit
 
 ### Contact
 - Email 6DammK9@gmail.com or create Issue / PR
