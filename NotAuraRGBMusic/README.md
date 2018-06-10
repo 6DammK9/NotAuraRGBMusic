@@ -1,18 +1,26 @@
 ﻿
 # NotAuraRGBMusic
-## Definitely not Aura RGB Music mode.
+> Definitely not Aura RGB Music mode. It is a music visualizer with RGB device integration.
+## Features
 - Flash lights according scientific calculation. 
 - It blasts with funky music and stay calm in monotone.
 - Instead of programming from bottom, it is scripted from top. Yes, it's a web application.
-### System requirement
-- NodeJS 32-bit ( from [aura-sdk](https://www.npmjs.com/package/aura-sdk) a.k.a [this thread](https://rog.asus.com/forum/showthread.php?101776-Aura-SDK-in-Javascript!) ), v8 or higher (written in ES2016+)
+## System requirement
+### Audio Visualizer
 - A Web Browser Supporting [ WebAudio](https://caniuse.com/#feat=audio-api) ( It's in [HTML5 spec](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API) ) and [ES2016+](https://kangax.github.io/compat-table/es2016plus/)
+### Backend RGB device control
+- NodeJS 32-bit ( from [aura-sdk](https://www.npmjs.com/package/aura-sdk) a.k.a [this thread](https://rog.asus.com/forum/showthread.php?101776-Aura-SDK-in-Javascript!) ), v8 or higher (written in ES2016+)
 - Internet Connection ( Installation + Fetching scripts on run )
 - An avaliable internet port ( default [http://localhost:9997/](http://localhost:9997/) )
 - A PC running Aura RGB ( Currently works in graphic card only )
+- [Asus Aura Sync](https://www.asus.com/campaign/aura/tw/download.html)
+- [Logitech Gaming Software](http://support.logitech.com/en_us/software/lgs)
+- [Razer Synapse](https://www.razer.com/synapse)
+### (In progress) Performance Boost
 - Chrome 66+ for enabling [AudioWorklet](https://developer.mozilla.org/en-US/docs/Web/API/Worklet/addModule), a new sound processing routine. 
--- ( Currently having **360+ FPS** on sound processing instead of V-synced with canvas ) 
+-- ( Currently having **360+ FPS** on sound processing instead of V-synced with canvas) 
 ### Installation
+- Install all required software
 - Clone or Download this repository
 - Locate the folder `./NotAuraRGBMusic` via CLI 
 -- For Windows, go to that folder, `Shift+Enter` and "open console in folder".
@@ -47,19 +55,26 @@
 - Draw the spectrum, and send the RGB value (scaled to device's parameter) to server via WebSocket
 - When server received RGB value, buffer it and poll to Aura RGB devices by interval
 ### Options
+- The cover page should contains all the general options.
 - Coming soon ( just modify scripts and try )
 ### TODOs
-- Find hardware to test `aura-sdk` ( I have RGB GPU only )
-- Razor / Cosair hardware? (Need hardware)
-- Perkey rendering in Logitech Keyboard? (Need hardware)
-- Configuration file for server (seperate class) + Configuration in entry point ( webpage will come as url query + button )
+- Find hardware to test `aura-sdk` ( I still don't have Asus MB )
+- Need Keyboards supporting per key adjustment ( One per brand! )
+- Configuration file for server (seperate class)
 - Code review ( currently it's totally in mess )
-- Supress polling frequency to server by delta
 - Using solely on AudioWorklet (Very useful when in extreme condition. < 30FPS in highest setting in animation, audio and web transfer) instead of AnalyserNode in main process
+- [WebAssembly](https://developer.mozilla.org/en-US/docs/WebAssembly)
 - Even more standalone solution - Pack everything in Electron, using IPC to communicate
 - C# backend?
 - Build script specially for `logiled`
+- Native Razor device control ( Currently done in HTTP CRUD control )
+### (Probably) rejected features 
+- Cosair Devices (or any stuff needs hardware (e.g. Arduino) to control)
+- Docker (Or any kinds of auto implementation)
+- Any OS other than Windows (Actually it is not supported from upstream)
 ### Changelog
+- 0.2.0
+-- Razor Device supported.
 
 - 0.1.0
 -- Logitech Device supported.

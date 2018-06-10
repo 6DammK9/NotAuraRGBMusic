@@ -36,7 +36,10 @@
     <Compile Include="AURA_WS.js" />
     <Compile Include="public\processor.js" />
     <Compile Include="server_modules\aura_sync.js" />
+    <Compile Include="server_modules\p_chroma_sdk.js" />
     <Compile Include="server_modules\p_logiled.js" />
+    <Compile Include="server_modules\RzParamParser.js" />
+    <Compile Include="server_modules\RzErrors.js" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="public\" />
