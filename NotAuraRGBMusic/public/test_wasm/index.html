@@ -3,10 +3,35 @@
 
 </head>
 <body>
-    <script src="./a.out.js"></script>
+    <script type="text/javascript" src="wavelengthToColor.js"></script>
     <script>
-        console.log(window.Module);
-        console.log(window.Module.exports);
+        /**
+        const memory = new WebAssembly.Memory({ initial: 256, maximum: 256 });
+        const importObj = {
+            env: {
+                abortStackOverflow: () => { throw new Error('overflow'); },
+                table: new WebAssembly.Table({ initial: 0, maximum: 0, element: 'anyfunc' }),
+                tableBase: 0,
+                memory: memory,
+                memoryBase: 1024,
+                STACKTOP: 0,
+                STACK_MAX: memory.buffer.byteLength,
+            }
+        };
+        //fetch('hello.wasm').then((response) => response.arrayBuffer())
+        //    .then((bytes) => WebAssembly.instantiate(bytes, importObj))
+        //    .then((wa) => alert(wa.instance.exports._bezier1(0.5, 10, 20)));
+        fetch('wavelengthToColor.wasm').then((response) => response.arrayBuffer())
+            .then((bytes) => WebAssembly.instantiate(bytes, importObj))
+            .then((wa) => console.log(wa.instance.exports));
+        **/
+
+        //var em_module = require('./api_example.js');
+
+        setTimeout(() => {
+            console.log(Module);
+            console.log(Module._wavelengthToColor(780));
+        }, 1000);
     </script>
 </body>
 </html>

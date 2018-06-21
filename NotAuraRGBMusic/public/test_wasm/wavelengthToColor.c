@@ -1,8 +1,10 @@
-#include <cstdlib>
+#include <stdlib.h>
+#include <stdio.h>
+#include <emscripten/emscripten.h>
 //http://scienceprimer.com/javascript-code-convert-light-wavelength-color
 // takes wavelength in nm and returns an rgba value
 //_Z17wavelengthToColord
-double* wavelengthToColor(double wavelength) {
+EMSCRIPTEN_KEEPALIVE double* wavelengthToColor(double wavelength) {
 	double R = 0.0,
 		G = 0.0,
 		B = 0.0,
@@ -61,7 +63,8 @@ double* wavelengthToColor(double wavelength) {
 	}
 
 	//double colorSpace[4] = { R, G, B, alpha };
-	double *colorSpace = (double*)malloc(5);
+	double *colorSpace = malloc(sizeof(double) * 5);
+	//double colorSpace[5];
 	colorSpace[0] = 0.0; //Was a unused string
 	colorSpace[1] = R;
 	colorSpace[2] = G;

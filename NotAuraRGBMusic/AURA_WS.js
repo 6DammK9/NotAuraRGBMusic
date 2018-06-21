@@ -110,9 +110,13 @@ const readaudio = () => {
 };
 
 const main = async () => {
+    //console.log("aura_sync.init()");
     await aura_sync.init();
+    //console.log("p_logiled.init()");
     await p_logiled.init();
+    //console.log("p_chroma_sdk.init_sdk(CHROMA_SDK_URL)");
     await p_chroma_sdk.init_sdk(CHROMA_SDK_URL);
+    //console.log("p_chroma_sdk.init_session()");
     await p_chroma_sdk.init_session();
 
     server.listen(port);
@@ -121,6 +125,8 @@ const main = async () => {
 main().then(() => {
     setInterval(readaudio, led_t);
     console.log(io ? `WS Server is running on port ${port}` : `WS Server is not started`);
+}).catch((err) => {
+    console.log(err);
 });
 
 process.on('beforeExit', () => {

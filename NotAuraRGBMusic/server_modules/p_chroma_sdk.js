@@ -76,12 +76,13 @@ let init_sdk = async function (url) {
 let onTimer = async function () {
     return new Promise((t, f) => {
         if (!CHROMA_SESSION) { t(); }
-
-        request.put(`${CHROMA_SESSION}/heartbeat`, (e, r, b) => {
-            handle_er(e, r);
-            //console.log(b);
-            t();
-        });
+        else {
+            request.put(`${CHROMA_SESSION}/heartbeat`, (e, r, b) => {
+                handle_er(e, r);
+                //console.log(b);
+                t();
+            });
+        }
     });
 };
 
@@ -100,36 +101,37 @@ let init_session = async function () {
 let uninit_session = async function () {
     return new Promise((t, f) => {
         if (!CHROMA_SESSION) { t(); }
+        else {
+            request.delete({ url: CHROMA_SESSION, json: true, body: {} }, (e, r, b) => {
+                handle_er(e, r);
+                console.log(JSON.stringify(b));
+                t();
+            });
 
-        request.delete(CHROMA_SESSION, (e, r, b) => {
-            handle_er(e, r);
-            console.log(JSON.stringify(b));
-            t();
-        });
-
-        clearInterval(heartbeat_interval);
-        this.CHROMA_SESSION = undefined;
+            clearInterval(heartbeat_interval);
+            this.CHROMA_SESSION = undefined;
+        }
     });
 };
 
 let setEffect = async function (id) {
     return new Promise((t, f) => {
         if (!CHROMA_SESSION) { t(); }
-        request.put({ url: `${CHROMA_SESSION}/effect`, json: true, body: { id } }, (e, r, b) => { handle_erb.effect(e, r, b, t, f); });
+        else { request.put({ url: `${CHROMA_SESSION}/effect`, json: true, body: { id } }, (e, r, b) => { handle_erb.effect(e, r, b, t, f); }); }
     });
 };
 
 let deleteEffect = async function (id) {
     return new Promise((t, f) => {
         if (!CHROMA_SESSION) { t(); }
-        request.delete({ url: `${CHROMA_SESSION}/effect`, json: true, body: { id } }, (e, r, b) => { handle_erb.effect(e, r, b, t, f); });
+        else { request.delete({ url: `${CHROMA_SESSION}/effect`, json: true, body: { id } }, (e, r, b) => { handle_erb.effect(e, r, b, t, f); }); }
     });
 }
 
 let deleteEffectGroup = async function (ids) {
     return new Promise((t, f) => {
         if (!CHROMA_SESSION) { t(); }
-        request.delete({ url: `${CHROMA_SESSION}/effect`, json: true, body: ids }, (e, r, b) => { handle_erb.effect(e, r, b, t, f); });
+        else { request.delete({ url: `${CHROMA_SESSION}/effect`, json: true, body: ids }, (e, r, b) => { handle_erb.effect(e, r, b, t, f); }); }
     });
 }
 
@@ -137,7 +139,7 @@ let staticColorAll = async function (color) {
     Object.values(device_supported).forEach((device) => {
         p_create_effect("put", device, "CHROMA_STATIC", color).catch(console.log);
     });
-}; 
+};
 
 module.exports = {
     init_sdk,

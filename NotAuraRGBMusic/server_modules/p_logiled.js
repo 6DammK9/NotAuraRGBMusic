@@ -7,7 +7,7 @@ var logiled = require('logiled');
 let sleep = ms => new Promise(r => setTimeout(r, ms))
 
 const p_logiled = {
-    init: () => { return new Promise((t, f) => { if (logiled.init()) { t(); } else { f(); } }); },
+    init: () => { return new Promise((t, f) => { if (logiled.init()) { t(); } else { console.log("p_logiled: Init failed."); t(); } }); },
 
     //assert.equal(typeof version.majorNum, 'number');
     //assert.equal(typeof version.minorNum, 'number');
