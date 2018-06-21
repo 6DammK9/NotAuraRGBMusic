@@ -10,8 +10,11 @@ const CLIENT_WEBPAGE = 'analyser.html';
 
 const express = require('express');
 const app = express();
-const server = require('http').createServer(app)
+const server = require('http').createServer(app);
 const io = require('socket.io')(server);
+
+let aura_diabled = false;
+let logiled_disabled = false;
 
 const arraysEqual = (a, b) => {
     /*
@@ -59,7 +62,7 @@ io.on('connection', (socket) => {
         if (!arraysEqual(cur.logi, new_arr)) {
             cur.logi = new_arr;
             fps_a.logi++;
-        }
+        } 
 
         //aurasync.forEach( led => led.setColor(`rgb(${cur[0]}, ${cur[1]}, ${cur[2]})`));
         //console.log(cur);
@@ -89,10 +92,10 @@ const readaudio = () => {
     };
 
     if (skip_counter % skip_everysent) {
-        if (cur.aura.reduce((c, a) => c + a)) {
+        if (cur.aura.reduce((c, a) => c + a) && !aura_diabled) {
             aura_sync.setColorNow(cur.aura[0], cur.aura[1], cur.aura[2]);
         }
-        if (cur.logi.reduce((c, a) => c + a)) {
+        if (cur.logi.reduce((c, a) => c + a) && !logiled_disabled) {
             p_logiled.setLighting(cur.logi[0], cur.logi[1], cur.logi[2]).catch(console.log);
         }
     }
@@ -104,7 +107,12 @@ const readaudio = () => {
 
 const main = async () => {
     await aura_sync.init();
-    await p_logiled.init();
+    try {
+        await p_logiled.init();
+    } catch (e) {
+        console.log("Logiled cannot be booted.");
+        logiled_disabled = true;
+    }
 
     server.listen(port);
 };
@@ -112,4 +120,4 @@ const main = async () => {
 main().then(() => {
     setInterval(readaudio, led_t);
     console.log(io ? `WS Server is running on port ${port}` : `WS Server is not started`);
-});
+}).catch(console.log);
