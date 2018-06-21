@@ -13,6 +13,7 @@
     "aura-sdk": "^1.0.0",
     "express": "^4.16.3",
     "logiled": "^1.0.0",
+    "request": "^2.87.0",
     "socket.io": "^2.1.0"
   }
 }

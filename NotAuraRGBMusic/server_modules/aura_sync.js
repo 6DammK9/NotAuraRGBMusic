@@ -5,8 +5,8 @@ let aurasync = null;
 const setColorNow = async (r, g, b) => {
     if (aurasync)
         aurasync.forEach(led => led.setColorNow(`rgb(${r}, ${g}, ${b})`));
-        //aurasync.forEach(led => led.setColorNow(`rgb(32,32,32)`));
-        //aurasync.forEach( led => led.updateColor() );
+    //aurasync.forEach(led => led.setColorNow(`rgb(32,32,32)`));
+    //aurasync.forEach( led => led.updateColor() );
 };
 
 const init = async () => {
@@ -49,6 +49,6 @@ const init = async () => {
 };
 
 module.exports = {
-    init: init,
-    setColorNow: setColorNow
+    init,
+    setColorNow
 };
