@@ -29,8 +29,32 @@
         //var em_module = require('./api_example.js');
 
         setTimeout(() => {
-            console.log(Module);
-            console.log(Module._wavelengthToColor(780));
+            //console.log(Module);
+
+            //var wavelengthToColor = Module.cwrap('wavelengthToColor', ['number'], [['number'], 'number']);
+
+            var result_ptr = null;
+            var result_obj = null;
+            //colorSpace[0] = 0.0; //Was a unused string
+            //colorSpace[1] = R;
+            //colorSpace[2] = G;
+            //colorSpace[3] = B;
+            //colorSpace[4] = alpha;
+
+            for (var i = 380; i <= 780; i++) {
+                result_ptr = Module._wavelengthToColor(i);
+                result_obj = {
+                    F: i,
+                    R: Module.HEAPF64[result_ptr / Float64Array.BYTES_PER_ELEMENT + 1],
+                    G: Module.HEAPF64[result_ptr / Float64Array.BYTES_PER_ELEMENT + 2],
+                    B: Module.HEAPF64[result_ptr / Float64Array.BYTES_PER_ELEMENT + 3],
+                    A: Module.HEAPF64[result_ptr / Float64Array.BYTES_PER_ELEMENT + 4]
+                };
+                console.log(result_obj);
+
+                //document.body.style.backgroundColor = `rgba(${Math.floor(result_obj.R * 255)},${Math.floor(result_obj.G * 255)},${Math.floor(result_obj.B * 255)},${result_obj.A})`;
+            }
+
         }, 1000);
     </script>
 </body>

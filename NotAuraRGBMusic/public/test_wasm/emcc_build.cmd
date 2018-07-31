@@ -1,0 +1,1 @@
+emcc wavelengthToColor.c -s WASM=1 -o wavelengthToColor.js

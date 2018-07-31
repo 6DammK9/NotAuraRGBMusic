@@ -4,7 +4,7 @@
 //http://scienceprimer.com/javascript-code-convert-light-wavelength-color
 // takes wavelength in nm and returns an rgba value
 //_Z17wavelengthToColord
-EMSCRIPTEN_KEEPALIVE double* wavelengthToColor(double wavelength) {
+EMSCRIPTEN_KEEPALIVE double *wavelengthToColor(double wavelength) {
 	double R = 0.0,
 		G = 0.0,
 		B = 0.0,
