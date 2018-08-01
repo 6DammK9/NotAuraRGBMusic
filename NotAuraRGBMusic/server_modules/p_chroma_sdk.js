@@ -53,7 +53,7 @@ const handle_erb = {
 const p_create_effect = (r_fnc, device, effect, data) => {
     return new Promise((t, f) => {
         if (!CHROMA_SESSION) { t(); }
-        request[r_fnc]({ url: `${CHROMA_SESSION}/${device}`, json: true, body: RzParamParser.effects[device](effect, data) }, (e, r, b) => { handle_erb.effect(e, r, b, t, f); });
+        else { request[r_fnc]({ url: `${CHROMA_SESSION}/${device}`, json: true, body: RzParamParser.effects[device](effect, data) }, (e, r, b) => { handle_erb.effect(e, r, b, t, f); }); }
     });
 };
 

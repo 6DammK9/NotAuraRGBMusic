@@ -439,6 +439,7 @@
             };
 
             const start_analysis_frame = () => {
+                let t_start = new Date();
                 //console.log("yo");
 
                 let lowest_vol = 0;
@@ -486,6 +487,10 @@
                 led_r = freq_color_space[1] * Math.pow(256, freq_color_space[4] * g_result.led_pow);
                 led_g = freq_color_space[2] * Math.pow(256, freq_color_space[4] * g_result.led_pow);
                 led_b = freq_color_space[3] * Math.pow(256, freq_color_space[4] * g_result.led_pow);
+
+                let t_end = new Date();
+                //console.log(t_end - t_start);
+                g_result.t_es = t_end.getTime() - t_start.getTime();
             }
 
             const draw = () => {
@@ -562,7 +567,7 @@
 
             clearInterval(g_interval);
             g_interval = setInterval(() => {
-                console.log(g_result);
+                console.log([g_result.fps_a, g_result.t_es]);
                 g_result.last_fps_v = g_result.fps_v;
                 g_result.last_fps_a = g_result.fps_a;
                 g_result.fps_v = 0;

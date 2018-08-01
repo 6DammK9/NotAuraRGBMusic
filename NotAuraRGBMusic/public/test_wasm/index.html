@@ -28,34 +28,58 @@
 
         //var em_module = require('./api_example.js');
 
-        setTimeout(() => {
-            //console.log(Module);
 
+        console.log(Module);
+        Module.onRuntimeInitialized = function () {
             //var wavelengthToColor = Module.cwrap('wavelengthToColor', ['number'], [['number'], 'number']);
 
             var result_ptr = null;
             var result_obj = null;
+            var result_arr = null;
+            var arrayDataToPass = [0, 0, 0, 0, 0];
+            var buffer;
+
             //colorSpace[0] = 0.0; //Was a unused string
             //colorSpace[1] = R;
             //colorSpace[2] = G;
             //colorSpace[3] = B;
             //colorSpace[4] = alpha;
 
-            for (var i = 380; i <= 780; i++) {
-                result_ptr = Module._wavelengthToColor(i);
-                result_obj = {
-                    F: i,
-                    R: Module.HEAPF64[result_ptr / Float64Array.BYTES_PER_ELEMENT + 1],
-                    G: Module.HEAPF64[result_ptr / Float64Array.BYTES_PER_ELEMENT + 2],
-                    B: Module.HEAPF64[result_ptr / Float64Array.BYTES_PER_ELEMENT + 3],
-                    A: Module.HEAPF64[result_ptr / Float64Array.BYTES_PER_ELEMENT + 4]
-                };
-                console.log(result_obj);
+            try {
+                // Allocate some space in the heap for the data (making sure to use the appropriate memory size of the elements)
+                buffer = Module._malloc(arrayDataToPass.length * Float64Array.BYTES_PER_ELEMENT)
 
-                //document.body.style.backgroundColor = `rgba(${Math.floor(result_obj.R * 255)},${Math.floor(result_obj.G * 255)},${Math.floor(result_obj.B * 255)},${result_obj.A})`;
+                // Assign the data to the heap - Keep in mind bytes per element
+                //Module.HEAPF64.set(new Float64Array(arrayDataToPass.length), buffer / Float64Array.BYTES_PER_ELEMENT);
+
+                for (var i = 380; i <= 780; i++) {
+                    result_ptr = Module._wavelengthToColor(buffer, i);
+                    result_obj = {
+                        F: i,
+                        R: Module.HEAPF64[result_ptr / Float64Array.BYTES_PER_ELEMENT + 1],
+                        G: Module.HEAPF64[result_ptr / Float64Array.BYTES_PER_ELEMENT + 2],
+                        B: Module.HEAPF64[result_ptr / Float64Array.BYTES_PER_ELEMENT + 3],
+                        alpha: Module.HEAPF64[result_ptr / Float64Array.BYTES_PER_ELEMENT + 4]
+                    };
+                    result_arr = [result_ptr, "rgba(" + (result_obj.R * 100) + "%," + (result_obj.G * 100) + "%," + (result_obj.B * 100) + "%, " + result_obj.alpha + ")", result_obj.R, result_obj.G, result_obj.B, result_obj.alpha]
+
+                    console.log(result_arr);
+
+                    // colorSpace is an array with 5 elements.
+                    // The first element is the complete code as a string.
+                    // Use colorSpace[0] as is to display the desired color.
+                    // use the last four elements alone or together to access each of the individual r, g, b and a channels.
+
+                    //document.body.style.backgroundColor = `rgba(${Math.floor(result_obj.R * 255)},${Math.floor(result_obj.G * 255)},${Math.floor(result_obj.B * 255)},${result_obj.A})`;
+                }
+            } catch (e) {
+                console.log(e);
+            } finally {
+                // To avoid memory leaks we need to always clear out the allocated heap data
+                // This needs to happen in the finally block, otherwise thrown errors will stop code execution before this happens
+                Module._free(buffer)
             }
-
-        }, 1000);
+        }
     </script>
 </body>
 </html>
