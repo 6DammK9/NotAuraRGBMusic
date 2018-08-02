@@ -1,1 +1,1 @@
-emcc wavelengthToColor.c -s WASM=1 -o wavelengthToColor.js
+emcc wavelengthToColor.c -s WASM=1 -s ALLOW_MEMORY_GROWTH=1 -o wavelengthToColor.js

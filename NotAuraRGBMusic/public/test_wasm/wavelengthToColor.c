@@ -6,6 +6,8 @@
 
 //Note: Everything will be in 64-bit a.k.a double! Make sure everything in JS is in Float64Array! 
 
+EMSCRIPTEN_KEEPALIVE int test() { return 1337; }
+
 //http://scienceprimer.com/javascript-code-convert-light-wavelength-color
 // takes wavelength in nm and returns an rgba value
 EMSCRIPTEN_KEEPALIVE double *wavelengthToColor(double* colorSpace, double wavelength) {
@@ -143,7 +145,7 @@ EMSCRIPTEN_KEEPALIVE double pitch_fz(double* buf, int SIZE, int sampleRate, int 
 			shift = (correlations[best_offset + 1] - correlations[best_offset - 1]) / correlations[best_offset];
 			//console.log(correlation);
 			//return { freq: (sampleRate / (best_offset + (8 * shift))), vol : rms };
-			return (sampleRate / (best_offset + (8 * shift)));
+			return (sampleRate / (best_offset + (8.0 * shift)));
 		}
 		lastCorrelation = currentCorrelation;
 	}
@@ -164,7 +166,7 @@ EMSCRIPTEN_KEEPALIVE double vol_rms(double* VolArray, int ArrayLength) {
 	double vol_sum = 0;
 	int i = 0;
 	for (i = 0; i < ArrayLength; i++) {
-		vol_sum += pow(VolArray[i], 2);
+		vol_sum += pow(VolArray[i], 2.0);
 	}
 	return sqrt(vol_sum / ArrayLength);
 }
@@ -175,7 +177,17 @@ EMSCRIPTEN_KEEPALIVE double vol_rms(double* VolArray, int ArrayLength) {
 // 1 / ( 1 / 380 - 1 / 780 ) = 741
 EMSCRIPTEN_KEEPALIVE double sound_freq_to_light_wavelength(double s_freq, double spectrum_base, double octave_range, double min_octave, double octave_relative_offset_low, double octave_relative_offset_high) {
 	//It should able to be infinity.
-	double octave = log(s_freq / spectrum_base) / log(2) - min_octave;
+	double octave = log2(s_freq / spectrum_base) - min_octave;
 	double octave_scale = (octave_range - octave_relative_offset_high) / (octave + octave_relative_offset_low);
-	return 1 / (1 / 780 + 1 / (741 * octave_scale));
-};
+	return 1.0 / (1.0 / 780.0 + 1.0 / (741.0 * octave_scale));
+}
+
+EMSCRIPTEN_KEEPALIVE double barWidth(double canvas_width, double sum_width, double actual_freq, double spectrum_base, double min_octave) {
+	double width_multuply = canvas_width / sum_width;
+	//let width_multuply = ((canvas.width - bufferLength) / sum_width);
+	//width_multuply *
+	double octave = log2(actual_freq / spectrum_base) - min_octave;
+	return width_multuply * pow(2.0, - octave);
+	//return Math.pow(1.0035, bufferLength - i);
+	//return (canvas.width / bufferLength);
+}

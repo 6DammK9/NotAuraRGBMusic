@@ -6,7 +6,6 @@
     <link href="data:image/x-icon;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQEAYAAABPYyMiAAAABmJLR0T///////8JWPfcAAAACXBIWXMAAABIAAAASABGyWs+AAACbUlEQVRIx7WUsU/qUBTGv96WSlWeEBZijJggxrREdwYixMnByYEyOvgfsBAMG0xuDsZ/QGc3NDFhgTioiYsmkhBYGLSBkLYR0va8gSjvQXiIT7/l5ibfOd/v3pN7gSmVSMTj8ThRfzdYk8lkMpl83/+AVFVVVXU0eHiVJEmSpB8DIcpkMplsdhCYz+fzhQJROBwOh8PDQN+oQCAQCASIRFEURZHI45GkP0/e7Xa73e70AMJnjel0Op1OA6oaDB4eAkAw6PcDvZ5t6zrw/Hx2trAw/cHYZ426ruu6DtzcGEYuBzQa19etFvD4WKtls4AoRqMPDwBjjLGPrt84ilgsFovF6EOapmmaRiP6O/jbAIguL4vFYpHGqlKpVCoVomq1Wq1Wibxer9fn+w+Q9+cUiUQikQhNrfdgWZZlWf4yyGhj27Zt254MUK/X6/X6F0aiKIqiKIOCYRmGYRjGZADLsizLIgqFQqHV1SkAnp5OTn79ItK0qyuPZ7SxaZqmaU4GKJfPzxmbfAPc/f3pqaIQLS8vLtZqgOP0bYyJoiAARC5Xrwf4/Vtbb2+Th1YqlUqlErC01GgkEkCz2WxyHLC+LsuiCAiCJLlcgM+3vd3pcBzXaJTLR0dEs7Ptdv+D4TiOG/A6DsBxQKvV621sAGtru7vl8ngAjuvXv7xcXIgiwNjMjCj2h+k4fQfPA4LA8xwHCO323V2hABiG223bwPy8xwMAbvfcHGMAY32j47y+3t4OAsZpZ2dzEwAsy7IcBxAExhwHMIxOx3GAlZVUyjT/1WFIudzenstFlEpFo9M8o+Pj/X2eJzo4SCR4fnzdb2N4Pyv9cduVAAAAAElFTkSuQmCC" rel="icon" type="image/x-icon" />
     <title> Definitely Not Aura RGB </title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.1.1/socket.io.slim.js"></script>
-    <script type="text/javascript" src="wavelengthToColor.js"></script>
     <style>
 
         body {
@@ -39,122 +38,144 @@
     <script>
         'use strict';
 
-        const MIN_SAMPLES = 0;  // will be initialized when AudioContext is created.
-        const GOOD_ENOUGH_CORRELATION = 0.5; // this is the "bar" for how close a correlation needs to be
-        const ws_server = 'http://localhost:9997';
-        const octave_relative_offset = [-1.2, 0.8]; //[bottom, top]
-        const spectrum_base = 440; //Hz
-        const audible_range = [20, 20000];
-        const min_octave = Math.floor(Math.log(audible_range[0] / spectrum_base) / Math.log(2)); // -5
-        const octave_range = Math.floor(Math.log(audible_range[1] / spectrum_base) / Math.log(2)) - Math.floor(Math.log(audible_range[0] / spectrum_base) / Math.log(2)); //9.965784
-        let WASM_avaliable = false;
+        //http://scienceprimer.com/javascript-code-convert-light-wavelength-color
+        // takes wavelength in nm and returns an rgba value
+        const wavelengthToColor = (wavelength) => {
+            var R,
+                G,
+                B,
+                alpha,
+                colorSpace,
+                wl = wavelength,
+                gamma = 1;
 
-        //WASM related global variables
-        let WASM_intermediate = {
-            "wavelengthToColor": {
-                fnc_ptr: Module._wavelengthToColor,
-                out_ptr: null,
-                in_arr: [0, 0, 0, 0, 0],
-                fnc_buffer: null,
-                load_fnc_buffer: function () {
-                    //Allocate some space in the heap for the data (making sure to use the appropriate memory size of the elements)
-                    //console.log(this);
-                    this.fnc_buffer = Module._malloc(this.in_arr.length * Float64Array.BYTES_PER_ELEMENT);
-                },
-                free_fnc_buffer: function () {
-                    Module._free(this.fnc_buffer);
-                },
-                get_fnc_buffer_F64: function (offset) {
-                    return Module.HEAPF64[this.out_ptr / Float64Array.BYTES_PER_ELEMENT + offset];
-                },
-                fnc_wrapped: function (wavelength) {
-                    // Assign the data to the heap - Keep in mind bytes per element
-                    let that = WASM_intermediate["wavelengthToColor"];
-                    Module.HEAPF64.set(new Float64Array(that.in_arr.length), that.fnc_buffer / Float64Array.BYTES_PER_ELEMENT);
-                    //console.log(that.fnc_buffer);
-                    that.out_ptr = that.fnc_ptr(that.fnc_buffer, wavelength);
-                    return [null, that.get_fnc_buffer_F64(1), that.get_fnc_buffer_F64(2), that.get_fnc_buffer_F64(3), that.get_fnc_buffer_F64(4)];
-                }
-            },
-            "pitch_fz": {
-                fnc_ptr: Module._pitch_fz,
-                fnc_buffer: null,
-                load_fnc_buffer: function (SIZE) {
-                    //Allocate some space in the heap for the data (making sure to use the appropriate memory size of the elements)
-                    this.fnc_buffer = Module._malloc(SIZE * Float64Array.BYTES_PER_ELEMENT);
-                    //console.log(this.fnc_buffer, SIZE);
-                },
-                free_fnc_buffer: function () {
-                    Module._free(this.fnc_buffer);
-                },
-                fnc_wrapped: function (AnotherDataArray, sampleRate, MIN_SAMPLES, GOOD_ENOUGH_CORRELATION) {
-                    let that = WASM_intermediate["pitch_fz"];
-                    // Assign the data to the heap - Keep in mind bytes per element
-                    Module.HEAPF64.set(new Float64Array(AnotherDataArray), that.fnc_buffer / Float64Array.BYTES_PER_ELEMENT);
-                    //console.log(that.fnc_buffer, AnotherDataArray.length);
-                    return that.fnc_ptr(that.fnc_buffer, AnotherDataArray.length, sampleRate, MIN_SAMPLES, GOOD_ENOUGH_CORRELATION);
-                }
-            },
-            "vol_rms": {
-                fnc_ptr: Module._vol_rms,
-                fnc_buffer: null,
-                load_fnc_buffer: function (SIZE) {
-                    //Allocate some space in the heap for the data (making sure to use the appropriate memory size of the elements)
-                    this.fnc_buffer = Module._malloc(SIZE * Float64Array.BYTES_PER_ELEMENT);
-                    //console.log(this.fnc_buffer, SIZE);
-                },
-                free_fnc_buffer: function () {
-                    Module._free(this.fnc_buffer);
-                },
-                fnc_wrapped: function (AnotherDataArray) {
-                    let that = WASM_intermediate["vol_rms"];
-                    // Assign the data to the heap - Keep in mind bytes per element
-                    Module.HEAPF64.set(new Float64Array(AnotherDataArray), that.fnc_buffer / Float64Array.BYTES_PER_ELEMENT);
-                    //console.log(that.fnc_buffer, AnotherDataArray.length);
-                    return that.fnc_ptr(that.fnc_buffer, AnotherDataArray.length);
-                }
-            },
-            "sound_freq_to_light_wavelength": {
-                fnc_ptr: Module._sound_freq_to_light_wavelength,
-                fnc_wrapped: function (s_freq) {
-                    let that = WASM_intermediate["sound_freq_to_light_wavelength"];
-                    return that.fnc_ptr(s_freq, spectrum_base, octave_range, min_octave, octave_relative_offset[0], octave_relative_offset[1]);
-                }
-            },
-            "barWidth": {
-                fnc_ptr: Module._barWidth,
-                fnc_wrapped: function (canvas_width, sum_width, actual_freq) {
-                    let that = WASM_intermediate["barWidth"];
-                    return that.fnc_ptr(canvas_width, sum_width, actual_freq, spectrum_base, min_octave);
-                }
+
+            if (wl >= 380 && wl < 440) {
+                R = -1 * (wl - 440) / (440 - 380);
+                G = 0;
+                B = 1;
+            } else if (wl >= 440 && wl < 490) {
+                R = 0;
+                G = (wl - 440) / (490 - 440);
+                B = 1;
+            } else if (wl >= 490 && wl < 510) {
+                R = 0;
+                G = 1;
+                B = -1 * (wl - 510) / (510 - 490);
+            } else if (wl >= 510 && wl < 580) {
+                R = (wl - 510) / (580 - 510);
+                G = 1;
+                B = 0;
+            } else if (wl >= 580 && wl < 645) {
+                R = 1;
+                G = -1 * (wl - 645) / (645 - 580);
+                B = 0.0;
+            } else if (wl >= 645 && wl <= 780) {
+                R = 1;
+                G = 0;
+                B = 0;
+            } else {
+                R = 0;
+                G = 0;
+                B = 0;
             }
-        };
 
-        Module.onRuntimeInitialized = function () {
-            WASM_avaliable = true;
-        };
+            // intensty is lower at the edges of the visible spectrum.
+            if (wl > 780 || wl < 380) {
+                alpha = 0;
+            } else if (wl > 700) {
+                alpha = (780 - wl) / (780 - 700);
+            } else if (wl < 420) {
+                alpha = (wl - 380) / (420 - 380);
+            } else {
+                alpha = 1;
+            }
 
-        const WASM_LoadBuffer = function (FFTSize) {
-            WASM_intermediate["wavelengthToColor"].load_fnc_buffer();
-            WASM_intermediate["pitch_fz"].load_fnc_buffer(FFTSize);
-            WASM_intermediate["vol_rms"].load_fnc_buffer(FFTSize);
-        };
+            colorSpace = ["rgba(" + (R * 100) + "%," + (G * 100) + "%," + (B * 100) + "%, " + alpha + ")", R, G, B, alpha]
 
-        const WASM_UnloadBuffer = function () {
-            WASM_intermediate["wavelengthToColor"].free_fnc_buffer();
-            WASM_intermediate["pitch_fz"].free_fnc_buffer();
-            WASM_intermediate["vol_rms"].free_fnc_buffer();
+            // colorSpace is an array with 5 elements.
+            // The first element is the complete code as a string.
+            // Use colorSpace[0] as is to display the desired color.
+            // use the last four elements alone or together to access each of the individual r, g, b and a channels.
+
+            return colorSpace;
         }
 
-        window.onunload = function () {
-            WASM_UnloadBuffer();
-        };
 
-        const wavelengthToColor = WASM_intermediate["wavelengthToColor"].fnc_wrapped;
-        const pitch_fz = WASM_intermediate["pitch_fz"].fnc_wrapped;
-        const vol_rms = WASM_intermediate["vol_rms"].fnc_wrapped;
-        const sound_freq_to_light_wavelength = WASM_intermediate["sound_freq_to_light_wavelength"].fnc_wrapped;
-        const barWidth = WASM_intermediate["barWidth"].fnc_wrapped;
+        const MIN_SAMPLES = 0;  // will be initialized when AudioContext is created.
+        const GOOD_ENOUGH_CORRELATION = 0.5; // this is the "bar" for how close a correlation needs to be
+
+        function autoCorrelate(buf, sampleRate) {
+            const SIZE = buf.length;
+            const MAX_SAMPLES = Math.floor(SIZE / 2);
+            //console.log(MAX_SAMPLES);
+
+            let best_offset = -1;
+            let best_correlation = 0;
+            let rms = 0;
+            let foundGoodCorrelation = false;
+            let correlations = new Array(MAX_SAMPLES);
+
+            for (var i = 0; i < SIZE; i++) {
+                var val = buf[i];
+                rms += val * val;
+            }
+            rms = Math.sqrt(rms / SIZE);
+            //g_result.rms = rms;
+            //console.log(rms);
+            if (rms < 0.01) // not enough signal
+                return { freq: -1, vol: rms };
+
+            var lastCorrelation = 1;
+
+            //console.log({MIN_SAMPLES,MAX_SAMPLES});
+
+            for (var offset = MIN_SAMPLES; offset < MAX_SAMPLES; offset++) {
+                var correlation = 0;
+
+                for (var i = 0; i < MAX_SAMPLES; i++) {
+                    correlation += Math.abs((buf[i]) - (buf[i + offset]));
+                }
+
+                //console.log(correlation);
+
+                correlation = 1 - (correlation / MAX_SAMPLES);
+                correlations[offset] = correlation; // store it, for the tweaking we need to do below.
+                if ((correlation > GOOD_ENOUGH_CORRELATION) && (correlation > lastCorrelation)) {
+                    foundGoodCorrelation = true;
+                    if (correlation > best_correlation) {
+                        best_correlation = correlation;
+                        best_offset = offset;
+                    }
+                } else if (foundGoodCorrelation) {
+                    // short-circuit - we found a good correlation, then a bad one, so we'd just be seeing copies from here.
+                    // Now we need to tweak the offset - by interpolating between the values to the left and right of the
+                    // best offset, and shifting it a bit.  This is complex, and HACKY in this code (happy to take PRs!) -
+                    // we need to do a curve fit on correlations[] around best_offset in order to better determine precise
+                    // (anti-aliased) offset.
+
+                    // we know best_offset >=1,
+                    // since foundGoodCorrelation cannot go to true until the second pass (offset=1), and
+                    // we can't drop into this clause until the following pass (else if).
+
+                    var shift = (correlations[best_offset + 1] - correlations[best_offset - 1]) / correlations[best_offset];
+                    //console.log(correlation);
+                    return { freq: (sampleRate / (best_offset + (8 * shift))), vol: rms };
+                }
+                lastCorrelation = correlation;
+            }
+
+            //When it's the very first band.
+            if (best_correlation > 0.01) {
+                return { freq: (sampleRate / best_offset), vol: rms };
+            }
+
+            //console.log("f = " + sampleRate/best_offset + "Hz (rms: " + rms + " confidence: " + best_correlation + ")")
+            return { freq: -1, vol: rms };
+            //	var best_frequency = sampleRate/best_offset;
+        }
+
+        const ws_server = 'http://localhost:9997';
 
         const main = (ms_input) => {
             let socket = null;
@@ -205,9 +226,7 @@
             const bufferLength = analyserNode.frequencyBinCount;
             let dataArray = new Float32Array(bufferLength);
             const anotherbufferlength = analyserNode.fftSize;
-            let AnotherDataArray = new Float32Array(anotherbufferlength);
-
-            WASM_LoadBuffer(AnotherDataArray.length);
+            let AnothrDataArray = new Float32Array(anotherbufferlength);
 
             //Create Process node (It is not working. onaudioprocess never called.)
             //let scriptNode = audioCtx.createScriptProcessor(1024, 1, 1);
@@ -230,34 +249,24 @@
                     let AWNode = new AudioWorkletNode(audioCtx, 'my-worklet-processor');
 
                     let aw_lock = false;
-                    //const max_poll_freq = 1;
-                    const LAG_FACTOR = 10; //Analyse after X different frame
-                    let sum_vol = 0;
-                    let c = 0;
+                    const max_poll_freq = 144;
+
 
                     AWNode.port.onmessage = (event) => {
                         // Handling data from the processor.
                         //console.log(event);
-                        if (aw_lock) {
-                            //console.log("locked");
-                            return;
-                        }
+                        if (aw_lock) { console.log("locked"); return; }
                         aw_lock = true;
 
-                        //if (socket && Math.random() < max_poll_freq / g_result.last_fps_a) {
-                        if (socket) {
+                        if (socket && Math.random() < max_poll_freq / g_result.last_fps_a) {
                             analyserNode.getFloatFrequencyData(dataArray);
-                            c = dataArray.reduce((a, b) => a + b);
-                            //console.log([c,sum_vol]);
-                            if ((c != sum_vol) && (Math.random() < (1 / LAG_FACTOR))) {
-                                analyserNode.getFloatTimeDomainData(AnotherDataArray);
-                                start_analysis_frame();
-                                socket.emit("aura", [led_r, led_g, led_b]);
-                                socket.emit("logi", [sce_r, sce_g, sce_b].map(d => Math.round(d / 256 * 100)));
-                                g_result.fps_a++;
-                            }
-                            sum_vol = c;
+                            analyserNode.getFloatTimeDomainData(AnothrDataArray);
+                            start_analysis_frame();
+
+                            socket.emit("aura", [led_r, led_g, led_b]);
+                            socket.emit("logi", [sce_r, sce_g, sce_b].map(d => Math.round(d / 256 * 100)));
                         }
+                        g_result.fps_a++;
                         aw_lock = false;
                     };
 
@@ -318,12 +327,8 @@
             const canvasCtx = canvas.getContext('2d');
             canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
 
-            //Audio >>> Image thanks.
-            canvasCtx.mozImageSmoothingEnabled = false;
-            canvasCtx.webkitImageSmoothingEnabled = false;
-            canvasCtx.msImageSmoothingEnabled = false;
-            canvasCtx.imageSmoothingEnabled = false;
-
+            const spectrum_base = 440; //Hz
+            const audible_range = [20, 20000];
             const sampleRate = audioCtx.sampleRate; //Hz (By observe)
             console.log({ sampleRate: sampleRate });
 
@@ -359,6 +364,8 @@
                     return w ? w : canvas.width;
                 }
             };
+            const min_octave = Math.floor(Math.log(audible_range[0] / spectrum_base) / Math.log(2)); // -5
+            const octave_range = Math.floor(Math.log(audible_range[1] / spectrum_base) / Math.log(2)) - Math.floor(Math.log(audible_range[0] / spectrum_base) / Math.log(2)); //9.965784
 
             const led_pow = function (rms, l_amp) {
                 //rms: Frame's RMS from time domain
@@ -372,6 +379,9 @@
                 return (Math.log(rms) + min) / min;
             }
 
+            const amp_ledpw = function (rgb, a) {
+                return rgb;
+            }
 
             const TWOPI = Math.PI * 2;
             const nuttall = function (i, N) {
@@ -390,12 +400,21 @@
                 return sampleRate * (i + 1) / analyserNode.fftSize;
             }
 
+            const barWidth = function (i) {
+
+                let width_multuply = canvas.width / sum_width();
+                //let width_multuply = ((canvas.width - bufferLength) / sum_width);
+                //width_multuply *
+                return width_multuply * Math.pow(2, - ((Math.log(actual_freq(i) / spectrum_base)) / Math.log(2) - min_octave));
+                //return Math.pow(1.0035, bufferLength - i);
+                //return (canvas.width / bufferLength);
+            }
+
             const log_sumWidth = () => {
                 let test_arr = [];
-                for (var i = 0; i < analyserNode.fftSize; i++) { test_arr.push(barWidth(canvas.width, sum_width(), actual_freq(i))); }
+                for (var i = 0; i < analyserNode.fftSize; i++) { test_arr.push(barWidth(i)); }
                 //console.log(min_octave);
                 //console.log(test_arr);
-
                 console.log(test_arr.reduce((a, b) => a + b));
             }
 
@@ -406,6 +425,18 @@
             let g_result = { fps_v: 0, fps_a: 0 };
             let g_interval = null;
             audioEle.onended = () => { keep_drawing = false; };
+
+            //Pretty create conversion. Audible to visible.
+            // 20~20000Hz = -5 to 5 octave.
+            // 10000 - 40 = 9960
+            // 1 / ( 1 / 380 - 1 / 780 ) = 741
+            const sound_freq_to_light_wavelength = (s_freq) => {
+                //It should able to be infinity.
+                const octave = Math.log(s_freq / spectrum_base) / Math.log(2) - min_octave;
+                const octave_relative_offset = [-1.2, 0.8]; //[bottom, top]
+                const octave_scale = (octave_range - octave_relative_offset[1]) / (octave + octave_relative_offset[0]);
+                return 1 / (1 / 780 + 1 / (741 * octave_scale));
+            };
 
             const start_analysis_frame = () => {
                 let t_start = new Date();
@@ -421,20 +452,21 @@
                 }
 
 
-                //let vol_sum = 0;
-                //for (let i = 0; i < anotherbufferlength; i++) {
-                //    vol_sum += Math.pow(AnotherDataArray[i], 2);
-                //}
+                let vol_sum = 0;
+                for (let i = 0; i < anotherbufferlength; i++) {
+                    vol_sum += Math.pow(AnothrDataArray[i], 2);
+                }
 
-                //let autocol = autoCorrelate(AnotherDataArray, sampleRate);
-                //let pitch_fz = autocol.freq;
-                //let vol_rms = Math.sqrt(vol_sum / anotherbufferlength);
+                let autocol = autoCorrelate(AnothrDataArray, sampleRate);
+                let pitch_fz = autocol.freq;
+                let vol_rms = Math.sqrt(vol_sum / anotherbufferlength);
+
 
                 g_result.base_freq = base_freq.i;
-                g_result.pitch_fz = pitch_fz(AnotherDataArray, sampleRate, MIN_SAMPLES, GOOD_ENOUGH_CORRELATION);
+                g_result.pitch_fz = pitch_fz;
                 g_result.lowest_vol = lowest_vol;
                 //g_result.vol_rms_exp = Math.log(vol_rms); //autocol.vol;
-                g_result.led_pow = led_pow(vol_rms(AnotherDataArray), lowest_vol);
+                g_result.led_pow = led_pow(vol_rms, lowest_vol);
                 //g_result.vol_exp_rms = g_result.vol_exp_rms >= 0? g_result.vol_exp_rms : 0;
                 //console.log({pitch_fz, pitch});
                 //if (g_result.led_pow < 0) {console.log(g_result.led_pow);}
@@ -442,7 +474,7 @@
                 //Draw black background
                 const fill_bg_greyscale = Math.floor(g_result.led_pow * 256);
 
-                const freq_color_space = wavelengthToColor(sound_freq_to_light_wavelength(g_result.pitch_fz > 0 ? g_result.pitch_fz : sampleRate * (base_freq.i + 1) / analyserNode.fftSize));
+                const freq_color_space = wavelengthToColor(sound_freq_to_light_wavelength(pitch_fz > 0 ? pitch_fz : sampleRate * (base_freq.i + 1) / analyserNode.fftSize));
                 //freq_color_space=[rgba,r,g,b,a];
 
                 //canvasCtx.fillStyle = `rgba(${fill_bg_greyscale},${fill_bg_greyscale},${fill_bg_greyscale},1)`;
@@ -477,7 +509,7 @@
                 if (!socket || !foundWorklet) {
                     //Get spectrum data
                     analyserNode.getFloatFrequencyData(dataArray);
-                    analyserNode.getFloatTimeDomainData(AnotherDataArray);
+                    analyserNode.getFloatTimeDomainData(AnothrDataArray);
                     start_analysis_frame();
                 }
 
@@ -509,13 +541,13 @@
                     }
 
                     //Avoid Sub-pixel rendering (Will improve up to 5 FPS when fftsize is high)
-                    posX_add += barWidth(canvas.width, sum_width(), actual_freq(i));
+                    posX_add += barWidth(i);
                     if (posX_add >= canvas_inc) {
-                        canvasCtx.fillRect(posX, canvas.height - barHeight, barWidth(canvas.width, sum_width(), actual_freq(i)) >= canvas_inc ? barWidth(canvas.width, sum_width(), actual_freq(i)) : canvas_inc, barHeight);
+                        canvasCtx.fillRect(posX, canvas.height - barHeight, barWidth(i) >= canvas_inc ? barWidth(i) : canvas_inc, barHeight);
                         posX_add = 0;
                     }
                     //canvasCtx.fillRect(posX, canvas.height - barHeight, barWidth(i), barHeight);
-                    posX += barWidth(canvas.width, sum_width(), actual_freq(i));
+                    posX += barWidth(i);
                     //canvasCtx.fillRect(posX, canvas.height - barHeight, Math.round(barWidth(i)), barHeight);
                     //posX += Math.round(barWidth(i));
 
@@ -535,7 +567,7 @@
 
             clearInterval(g_interval);
             g_interval = setInterval(() => {
-                console.log(g_result);
+                console.log([g_result.fps_a, g_result.t_es]);
                 g_result.last_fps_v = g_result.fps_v;
                 g_result.last_fps_a = g_result.fps_a;
                 g_result.fps_v = 0;
@@ -555,7 +587,6 @@
             if (!navigator.mediaDevices) { alert_missing("navigator.mediaDevices"); return; }
             if (!navigator.mediaDevices.enumerateDevices) { alert_missing("enumerateDevices"); return; }
             if (!navigator.mediaDevices.getUserMedia) { alert_missing("getUserMedia"); return; }
-            if (!WASM_avaliable) { alert_missing("WASM"); return; }
 
             //console.log(navigator.mediaDevices.getSupportedConstraints());
 
@@ -582,7 +613,6 @@
                 .catch(console.log);
 
         }
-
     </script>
 </body>
 </html>

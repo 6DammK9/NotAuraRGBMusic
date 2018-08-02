@@ -30,7 +30,28 @@
 
 
         console.log(Module);
+
+        const octave_relative_offset = [-1.2, 0.8]; //[bottom, top]
+        const spectrum_base = 440; //Hz
+        const audible_range = [20, 20000];
+        const min_octave = Math.floor(Math.log(audible_range[0] / spectrum_base) / Math.log(2)); // -5
+        const octave_range = Math.floor(Math.log(audible_range[1] / spectrum_base) / Math.log(2)) - Math.floor(Math.log(audible_range[0] / spectrum_base) / Math.log(2)); //9.965784
+
+        let fnc_raw = (s_freq) => {
+            //It should able to be infinity.
+            const octave = Math.log(s_freq / spectrum_base) / Math.log(2) - min_octave;
+            const octave_scale = (octave_range - octave_relative_offset[1]) / (octave + octave_relative_offset[0]);
+            return 1 / (1 / 780 + 1 / (741 * octave_scale));
+        };
+
+
         Module.onRuntimeInitialized = function () {
+
+            console.log([
+                fnc_raw(440),
+                Module._sound_freq_to_light_wavelength(440, spectrum_base, octave_range, min_octave, octave_relative_offset[0], octave_relative_offset[1])
+            ]);
+
             //var wavelengthToColor = Module.cwrap('wavelengthToColor', ['number'], [['number'], 'number']);
 
             var result_ptr = null;
@@ -63,7 +84,7 @@
                     };
                     result_arr = [result_ptr, "rgba(" + (result_obj.R * 100) + "%," + (result_obj.G * 100) + "%," + (result_obj.B * 100) + "%, " + result_obj.alpha + ")", result_obj.R, result_obj.G, result_obj.B, result_obj.alpha]
 
-                    console.log(result_arr);
+                    //console.log(result_arr);
 
                     // colorSpace is an array with 5 elements.
                     // The first element is the complete code as a string.
