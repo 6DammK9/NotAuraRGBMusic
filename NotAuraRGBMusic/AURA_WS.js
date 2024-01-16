@@ -24,20 +24,20 @@ const arraysEqual = (a, b) => {
         definition.
     */
     if (a instanceof Array && b instanceof Array) {
-        if (a.length != b.length)  // assert same length
+        if (a.length != b.length) // assert same length
             return false;
-        for (var i = 0; i < a.length; i++)  // assert each element equal
+        for (var i = 0; i < a.length; i++) // assert each element equal
             if (!arraysEqual(a[i], b[i]))
                 return false;
         return true;
     } else {
         //console.log({a,b});
-        return a == b;  // if not both arrays, should be the same
+        return a == b; // if not both arrays, should be the same
     }
 }
 
 app.use(express.static(path.join(__dirname, 'public')));
-app.get('/', function (req, res) {
+app.get('/', function(req, res) {
     res.redirect(`./${CLIENT_WEBPAGE}`);
 });
 
@@ -109,7 +109,7 @@ const readaudio = () => {
     skip_counter %= skip_everysent;
 };
 
-const main = async () => {
+const main = async() => {
     //console.log("aura_sync.init()");
     await aura_sync.init();
     //console.log("p_logiled.init()");

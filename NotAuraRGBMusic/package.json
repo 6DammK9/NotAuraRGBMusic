@@ -6,14 +6,15 @@
   "author": {
     "name": "DammK YuZuXaWa"
   },
+  "license": "MIT",
   "scripts": {
     "start": "node ./AURA_WS.js"
   },
   "dependencies": {
-    "aura-sdk": "^1.0.0",
-    "express": "^4.16.3",
-    "logiled": "^1.0.0",
-    "request": "^2.87.0",
-    "socket.io": "^2.1.0"
+    "express": "^4.18.2",
+    "logiled": "^1.2.0",
+    "openrgb-sdk": "^0.5.2",
+    "request": "^2.88.2",
+    "socket.io": "^4.7.4"
   }
 }

@@ -1,4 +1,5 @@
-﻿
+﻿**Dead repo. Dependabot is so annoying, but I don't want to make this private. Therefore I rebuild the package.json**
+
 # NotAuraRGBMusic
 > Definitely not Aura RGB Music mode. It is a music visualizer with RGB device integration.
 ## Features
